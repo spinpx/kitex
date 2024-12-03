@@ -173,6 +173,7 @@ func (m *message) zero() {
 		delete(m.tags, k)
 	}
 	m.protocol = emptyProtocolInfo
+	m.svcSearcher = nil // Add this line
 }
 
 // RPCInfo implements the Message interface.
@@ -192,6 +193,9 @@ func (m *message) SpecifyServiceInfo(svcName, methodName string) (*serviceinfo.S
 			return nil, NewTransErrorWithMsg(UnknownMethod, fmt.Sprintf("unknown method %s", methodName))
 		}
 		return m.targetSvcInfo, nil
+	}
+	if m.svcSearcher == nil {
+		return nil, NewTransErrorWithMsg(UnknownService, "svcSearcher is nil")
 	}
 	svcInfo := m.svcSearcher.SearchService(svcName, methodName, false)
 	if svcInfo == nil {
