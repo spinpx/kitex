@@ -25,6 +25,7 @@ import (
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/pkg/generic"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 var _ Client = &genericServiceClient{}
@@ -49,10 +50,17 @@ func NewClientWithServiceInfo(destService string, g generic.Generic, svcInfo *se
 	if err != nil {
 		return nil, err
 	}
+	
+	streamClient, err := streaming.NewClient(kc)
+	if err != nil {
+		return nil, err
+	}
+	
 	cli := &genericServiceClient{
-		svcInfo: svcInfo,
-		kClient: kc,
-		g:       g,
+		svcInfo:      svcInfo,
+		kClient:      kc,
+		g:            g,
+		streamClient: streamClient,
 	}
 	runtime.SetFinalizer(cli, (*genericServiceClient).Close)
 
@@ -87,12 +95,16 @@ type Client interface {
 
 	// GenericCall generic call
 	GenericCall(ctx context.Context, method string, request interface{}, callOptions ...callopt.Option) (response interface{}, err error)
+
+	// GenericStream creates a streaming.Stream for sending requests
+	GenericStream(ctx context.Context, method string, callOptions ...callopt.Option) (streaming.Stream, error)
 }
 
 type genericServiceClient struct {
-	svcInfo *serviceinfo.ServiceInfo
-	kClient client.Client
-	g       generic.Generic
+	svcInfo      *serviceinfo.ServiceInfo
+	kClient      client.Client
+	g            generic.Generic
+	streamClient streaming.Client
 }
 
 func (gc *genericServiceClient) GenericCall(ctx context.Context, method string, request interface{}, callOptions ...callopt.Option) (response interface{}, err error) {
@@ -122,4 +134,9 @@ func (gc *genericServiceClient) Close() error {
 
 	// Notice: don't need to close kClient because finalizer will close it.
 	return gc.g.Close()
+}
+
+func (gc *genericServiceClient) GenericStream(ctx context.Context, method string, callOptions ...callopt.Option) (streaming.Stream, error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return gc.streamClient.NewStream(ctx, method)
 }
