@@ -193,6 +193,9 @@ func (m *message) SpecifyServiceInfo(svcName, methodName string) (*serviceinfo.S
 		}
 		return m.targetSvcInfo, nil
 	}
+	if m.svcSearcher == nil {
+		return nil, NewTransErrorWithMsg(UnknownService, "service searcher is not initialized")
+	}
 	svcInfo := m.svcSearcher.SearchService(svcName, methodName, false)
 	if svcInfo == nil {
 		return nil, NewTransErrorWithMsg(UnknownService, fmt.Sprintf("unknown service %s, method %s", svcName, methodName))

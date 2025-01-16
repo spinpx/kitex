@@ -101,7 +101,6 @@ func (s *server) init() {
 
 func fillContext(opt *internal_server.Options) context.Context {
 	ctx := context.Background()
-	ctx = context.WithValue(ctx, endpoint.CtxEventBusKey, opt.Bus)
 	ctx = context.WithValue(ctx, endpoint.CtxEventQueueKey, opt.Events)
 	return ctx
 }
