@@ -25,6 +25,7 @@ import (
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/pkg/generic"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"google.golang.org/grpc"
 )
 
 var _ Client = &genericServiceClient{}
@@ -49,10 +50,15 @@ func NewClientWithServiceInfo(destService string, g generic.Generic, svcInfo *se
 	if err != nil {
 		return nil, err
 	}
+	grpcConn, err := grpc.Dial(destService, grpc.WithInsecure())
+	if err != nil {
+		return nil, err
+	}
 	cli := &genericServiceClient{
-		svcInfo: svcInfo,
-		kClient: kc,
-		g:       g,
+		svcInfo:    svcInfo,
+		kClient:    kc,
+		g:          g,
+		grpcClient: grpcConn,
 	}
 	runtime.SetFinalizer(cli, (*genericServiceClient).Close)
 
@@ -87,16 +93,37 @@ type Client interface {
 
 	// GenericCall generic call
 	GenericCall(ctx context.Context, method string, request interface{}, callOptions ...callopt.Option) (response interface{}, err error)
+
+	// GenericStream creates a streaming.Stream for sending requests
+	GenericStream(ctx context.Context, method string, callOptions ...callopt.Option) (streaming.Stream, error)
 }
 
 type genericServiceClient struct {
 	svcInfo *serviceinfo.ServiceInfo
 	kClient client.Client
 	g       generic.Generic
+	grpcClient *grpc.ClientConn // Add this line
 }
 
 func (gc *genericServiceClient) GenericCall(ctx context.Context, method string, request interface{}, callOptions ...callopt.Option) (response interface{}, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+
+func (gc *genericServiceClient) GenericStream(ctx context.Context, method string, callOptions ...callopt.Option) (streaming.Stream, error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	desc := &grpc.StreamDesc{
+		StreamName:    method,
+		ServerStreams: true,
+		ClientStreams: true,
+	}
+	stream, err := gc.kClient.NewStream(ctx, desc, method)
+	if err != nil {
+		return nil, err
+	}
+	return &genericStream{
+		stream: stream,
+		g:      gc.g,
+	}, nil
+}
 	_args := gc.svcInfo.MethodInfo(method).NewArgs().(*generic.Args)
 	_args.Method = method
 	_args.Request = request
