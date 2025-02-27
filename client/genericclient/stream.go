@@ -97,6 +97,32 @@ func newStreamingClientWithServiceInfo(destService string, g generic.Generic, sv
 	}
 
 	return cli, nil
+
+type genericStream struct {
+	stream streaming.Stream
+	g      generic.Generic
+}
+
+func (gs *genericStream) SendMsg(m interface{}) error {
+	encodedMsg, err := gs.g.Encode(m)
+	if err != nil {
+		return err
+	}
+	return gs.stream.SendMsg(encodedMsg)
+}
+
+func (gs *genericStream) RecvMsg(m interface{}) error {
+	var encodedMsg []byte
+	err := gs.stream.RecvMsg(&encodedMsg)
+	if err != nil {
+		return err
+	}
+	return gs.g.Decode(encodedMsg, m)
+}
+
+func (gs *genericStream) CloseSend() error {
+	return gs.stream.CloseSend()
+}
 }
 
 func getGenericStreamingMethodInfoKey(streamingMode serviceinfo.StreamingMode) string {
